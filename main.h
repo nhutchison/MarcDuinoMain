@@ -76,6 +76,7 @@
 #define SETUP_SERVO_REVERSE "SR"	// Reverse Individual Servo.  #SRxxy where xx is the servo y is 0 for forward, 1 for reverse.
 #define SETUP_LAST_SERVO "SL"		// Servo Last // not used yet
 #define SETUP_START_SOUND "SS"		// Startup Sound. 0 = none, 1 = sound in 255, 2 = sound in 254, 3 = sound in 253
+#define SETUP_RANDOM_SOUND_DISABLED "SQ"		// Random Sounds Disabled.  0 = Random Sounds on, 1=Random Sounds disabled, R2 Quiet
 #define SETUP_SLAVE_DELAY_TIME "ST"	// Slave commanding delay.  Allow you to tune the time between sending the Slave panel command and starting master panel command execution.
 
 void echo(char ch);

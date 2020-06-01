@@ -236,6 +236,7 @@ unsigned int servo_eeprom_addr = 0;  // Stores setting for Servos 1-12
 unsigned int start_sound_eeprom_addr=2;
 unsigned int slave_delay_addr=3;
 unsigned int last_servo_addr=4;
+unsigned int random_sound_disabled=5;
 
 // timeout counter
 rt_timer killbuzz_timer;
@@ -381,7 +382,20 @@ int main(void) {
 		// Increased this slightly from 10s to 12 as the startup sounds were being cut off
 		_delay_ms(13000);
 	}
-	mp3_start_random();
+
+	// Is the random sounds disabled or not?
+	switch(eeprom_read_byte((uint8_t*)random_sound_disabled))
+	{
+		case 0:
+			mp3_start_random();
+			break;
+		case 1:
+			mp3_stop_random();
+			mp3_volumeoff();
+			break;
+		default:
+			break;
+	}
 #endif
 
 	// ready
@@ -706,6 +720,21 @@ void parse_setup_command(char* command, uint8_t length)
 		// Normally the value should be 255 (in the high order!)
 		//Write the value to EEPROM
 		eeprom_write_byte((uint8_t*)start_sound_eeprom_addr, value);
+		return;
+	}
+	if(strcmp(cmd,SETUP_RANDOM_SOUND_DISABLED)==0)
+	{
+		//Value must be either 0 or 1
+		if (value == 0)
+		{
+			//Write the value to EEPROM
+			eeprom_write_word((uint16_t*)random_sound_disabled, value);
+		}
+		if (value == 1)
+		{
+			//Write the value to EEPROM
+			eeprom_write_word((uint16_t*)random_sound_disabled, value);
+		}
 		return;
 	}
 	if(strcmp(cmd,SETUP_SLAVE_DELAY_TIME)==0)
