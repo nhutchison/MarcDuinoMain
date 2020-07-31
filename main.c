@@ -25,6 +25,7 @@
  *  Startup sound configurable via Setup Commands
  *  	Can be disabled, and save startup time
  *  	Up to 3 startup sounds supported
+ *  Default Chatty/Silent mode is configurable
  *  Experimental Wifly Reset Code removed
  *  Configurable Delay between Master and Servo Panel sequences
  *  Panel Speed can be set per row in the Panel Sequencer
@@ -186,6 +187,9 @@
  *	#SS01 Default Startup Sound in file 255
  *	#SS02 Alternate Startup Sound in file 254
  *	#SS03 Second Alternate Startup Sound in file 253
+ *	// Chatty/Silent Mode
+ *	#SQ00 Default Chatty Mode
+ *	#SQ01 Silent on startup
  *	//// PANEL SEQUENCER CONTROLS
  *	#STxx Setup Delay time between Master and Slave Panel Sequences.
  *		Use this if the Slave panels are starting too soon
@@ -392,6 +396,9 @@ int main(void) {
 		case 1:
 			mp3_stop_random();
 			mp3_volumeoff();
+			break;
+		case 2:
+			mp3_stop_random();
 			break;
 		default:
 			break;
@@ -731,6 +738,11 @@ void parse_setup_command(char* command, uint8_t length)
 			eeprom_write_word((uint16_t*)random_sound_disabled, value);
 		}
 		if (value == 1)
+		{
+			//Write the value to EEPROM
+			eeprom_write_word((uint16_t*)random_sound_disabled, value);
+		}
+		if (value == 2)
 		{
 			//Write the value to EEPROM
 			eeprom_write_word((uint16_t*)random_sound_disabled, value);
