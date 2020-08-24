@@ -17,7 +17,7 @@
  */
 
 /***********************
- *  Version 2.0
+ *  Version 3.0
  *  Support for 11 Servos on the Master
  *  EEPROM Support added for storing MarcDuino Settings
  *  Reverso Servo is now dynamic, using the Setup Commands
@@ -248,7 +248,7 @@ rt_timer killbuzz_timer;
 
 // string constants are in program memory to save DRAM
 const char strOK[] PROGMEM="OK\n\r";
-const char strWelcome[] PROGMEM="\n\rMarcDuino Master v2.0 \n\r";
+const char strWelcome[] PROGMEM="\n\rMarcDuino Master v3.3 \n\r";
 const char strEnterPrompt[] PROGMEM="Enter panel command starting with \':\' \n\r";
 const char strInitializing[] PROGMEM="Initializing...\r\n";
 const char strSuart1OK[] PROGMEM="\n\rsuart1 Communication OK \n\r";
@@ -619,6 +619,7 @@ void parse_setup_command(char* command, uint8_t length)
 			eeprom_write_word((uint16_t*)servo_eeprom_addr, (uint16_t)0x07FF);
 		}
 		SendSetupToSlave(cmd, value);
+		serial_puts_p(strOK);
 		return;
 	}
 	if(strcmp(cmd,SETUP_SERVO_REVERSE)==0)
@@ -698,6 +699,7 @@ void parse_setup_command(char* command, uint8_t length)
 
 		//Write the value to EEPROM
 		eeprom_write_word((uint16_t*)servo_eeprom_addr, (uint16_t)servo_set);
+		serial_puts_p(strOK);
 
 		return;
 	}
@@ -719,6 +721,7 @@ void parse_setup_command(char* command, uint8_t length)
 			//Write the value to EEPROM
 			eeprom_write_byte((uint8_t*)last_servo_addr, value);
 		}
+		serial_puts_p(strOK);
 		return;
 	}
 	if(strcmp(cmd,SETUP_START_SOUND)==0)
@@ -727,6 +730,7 @@ void parse_setup_command(char* command, uint8_t length)
 		// Normally the value should be 255 (in the high order!)
 		//Write the value to EEPROM
 		eeprom_write_byte((uint8_t*)start_sound_eeprom_addr, value);
+		serial_puts_p(strOK);
 		return;
 	}
 	if(strcmp(cmd,SETUP_RANDOM_SOUND_DISABLED)==0)
@@ -747,6 +751,7 @@ void parse_setup_command(char* command, uint8_t length)
 			//Write the value to EEPROM
 			eeprom_write_word((uint16_t*)random_sound_disabled, value);
 		}
+		serial_puts_p(strOK);
 		return;
 	}
 	if(strcmp(cmd,SETUP_SLAVE_DELAY_TIME)==0)
@@ -758,6 +763,7 @@ void parse_setup_command(char* command, uint8_t length)
 			value = 250;
 		}
 		eeprom_write_byte((uint8_t*)slave_delay_addr, value);
+		serial_puts_p(strOK);
 		return;
 	}
 #if _ERROR_MSG_ == 1
@@ -1616,7 +1622,7 @@ void open_command(uint8_t value)
 	}
 	if(value==14) // open top panels
 	{
-		for (i=7; i<=SERVO_NUM; i++)
+		for (i=7; i<=SERVO_NUM-1; i++)
 		{
 			servo_set(i, _OPN);
 		}
@@ -1630,6 +1636,7 @@ void open_command(uint8_t value)
 		{
 			servo_set(i, _OPN);
 		}
+		servo_set(11, _OPN);
 		//Panel 12 is the last lower panel on the slave
 		suart_puts(":OP07\r");
 		return;
