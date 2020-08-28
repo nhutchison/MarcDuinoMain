@@ -9,11 +9,22 @@
  *  Version 1.7: MarcDuino v2 support
  *  Version 1.8: I2C command parsing support, revised serial.c and i2c.h
  *
- *  Version 2.0
+ *  Version 3.0
  *  	Author: Neil Hutchison
  *  	Updated: March 14th, 2020
  *  	Setup Commands added, EEPROM Support, 13 Servo support etc
+ *  Version 3.2: Added new #SQ Mode to turn chatty off, but leave sound on.
+ *  Version 3.3: Added "OK" message on successful Setup command (errors were already present.
+ *  Version 3.4: EEPROM CRC added to enable saving of default settings if EEPROM corrupt or never written
  *
+ */
+
+/***********************
+ * Version 3.4
+ *
+ * Added CRC check to EEPROM
+ * 	If CRC fails, we write the defaults to the EEPROM
+ * 	This allows a base config to be written on first power up.
  */
 
 /***********************
@@ -241,6 +252,7 @@ unsigned int start_sound_eeprom_addr=2;
 unsigned int slave_delay_addr=3;
 unsigned int last_servo_addr=4;
 unsigned int random_sound_disabled=5;
+unsigned int stored_crc_addr = 6; // Uses a word.
 
 // timeout counter
 rt_timer killbuzz_timer;
@@ -300,6 +312,50 @@ int main(void) {
 		// Just wait ... should be ready soon
 		// Should be ready instantly, so this will likely not be called.
 		_delay_ms(500);
+	}
+
+	// Calculate the CRC for the EEPROM to determine if it has been written or not.
+	uint16_t calculatedCRC = calc_crc();
+
+	// Get the current CRC from the EEPROM
+	uint16_t storedCRC = eeprom_read_word((uint16_t*)stored_crc_addr);
+
+	char string[30];
+	sprintf(string, "Calc CRC: %X StoredCRC: %X \r\n", calculatedCRC, storedCRC);
+	serial_puts(string);
+
+	// If we've never written data to the EEPROM, the values will be 0xFF
+	// Use this and the CRC to determine if we should save a set of defaults.
+	if (storedCRC != calculatedCRC)
+	{
+		sprintf(string, "EEPROM Corrupt or never written.  Writing defaults. \r\n");
+		serial_puts(string);
+
+		// We have either corrupted the EEPROM, or
+		// we've never written to it before.
+		// Regardless, let's write good values!
+
+		// Set the Servo direction to "normal"
+		eeprom_write_word((uint16_t*)servo_eeprom_addr, (uint16_t)0x0000);
+
+		//Set the startup sound
+		eeprom_write_byte((uint8_t*)start_sound_eeprom_addr, 255);
+
+		// Set the Default chatty mode to on.
+		eeprom_write_byte((uint8_t*)random_sound_disabled, 0);
+
+		sprintf(string, "Generating new CRC. \r\n");
+		serial_puts(string);
+
+		// Now that we have written the new values we need to write the CRC
+		calculatedCRC = calc_crc();
+		sprintf(string, "Calc CRC: %X StoredCRC: %X \r\n", calculatedCRC, storedCRC);
+		serial_puts(string);
+
+		eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
+
+		sprintf(string, "New Defaults and CRC Written to EEPROM \r\n");
+		serial_puts(string);
 	}
 
 	// If Servo Direction is 0, then it's "forward servos"
@@ -491,6 +547,22 @@ int main(void) {
 return 0;
 }
 
+/*
+ * Calculate the CRC based on the values we use in the EEPROM
+ */
+uint16_t calc_crc()
+{
+	uint16_t calculatedCRC = 0;
+	// Set the Servo direction to "normal"
+	calculatedCRC += eeprom_read_word((uint16_t*)servo_eeprom_addr);
+	//Set the startup sound
+	calculatedCRC += eeprom_read_byte((uint8_t*)start_sound_eeprom_addr);
+	// Set the Default chatty mode to on.
+	calculatedCRC += eeprom_read_byte((uint8_t*)random_sound_disabled);
+
+	return calculatedCRC;
+}
+
 // builds the command string from the character input
 uint8_t build_command(char ch, char* output_str)
 {
@@ -619,6 +691,11 @@ void parse_setup_command(char* command, uint8_t length)
 			eeprom_write_word((uint16_t*)servo_eeprom_addr, (uint16_t)0x07FF);
 		}
 		SendSetupToSlave(cmd, value);
+
+		// Now that we have written the new values we need to write the CRC
+		uint16_t calculatedCRC = calc_crc();
+		eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
+
 		serial_puts_p(strOK);
 		return;
 	}
@@ -699,20 +776,16 @@ void parse_setup_command(char* command, uint8_t length)
 
 		//Write the value to EEPROM
 		eeprom_write_word((uint16_t*)servo_eeprom_addr, (uint16_t)servo_set);
+
+		// Now that we have written the new values we need to write the CRC
+		uint16_t calculatedCRC = calc_crc();
+		eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
+
 		serial_puts_p(strOK);
 
 		return;
 	}
-//	if(strcmp(cmd,SETUP_SERVO_DIR)==0)
-//	{
-//		//Value must be either 0 or 1
-//		if (value < 2)
-//		{
-//			//Write the value to EEPROM
-//			eeprom_write_byte((uint8_t*)servo_eeprom_addr, value);
-//		}
-//		return;
-//	}
+	// NOTE: NOT USED CURRENTLY
 	if(strcmp(cmd,SETUP_LAST_SERVO)==0)
 	{
 		//Max support is for 12 servos.
@@ -721,6 +794,9 @@ void parse_setup_command(char* command, uint8_t length)
 			//Write the value to EEPROM
 			eeprom_write_byte((uint8_t*)last_servo_addr, value);
 		}
+		// Now that we have written the new values we need to write the CRC
+		uint16_t calculatedCRC = calc_crc();
+		eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
 		serial_puts_p(strOK);
 		return;
 	}
@@ -730,6 +806,9 @@ void parse_setup_command(char* command, uint8_t length)
 		// Normally the value should be 255 (in the high order!)
 		//Write the value to EEPROM
 		eeprom_write_byte((uint8_t*)start_sound_eeprom_addr, value);
+		// Now that we have written the new values we need to write the CRC
+		uint16_t calculatedCRC = calc_crc();
+		eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
 		serial_puts_p(strOK);
 		return;
 	}
@@ -739,21 +818,25 @@ void parse_setup_command(char* command, uint8_t length)
 		if (value == 0)
 		{
 			//Write the value to EEPROM
-			eeprom_write_word((uint16_t*)random_sound_disabled, value);
+			eeprom_write_byte((uint8_t*)random_sound_disabled, value);
 		}
 		if (value == 1)
 		{
 			//Write the value to EEPROM
-			eeprom_write_word((uint16_t*)random_sound_disabled, value);
+			eeprom_write_byte((uint8_t*)random_sound_disabled, value);
 		}
 		if (value == 2)
 		{
 			//Write the value to EEPROM
-			eeprom_write_word((uint16_t*)random_sound_disabled, value);
+			eeprom_write_byte((uint8_t*)random_sound_disabled, value);
 		}
+		// Now that we have written the new values we need to write the CRC
+		uint16_t calculatedCRC = calc_crc();
+		eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
 		serial_puts_p(strOK);
 		return;
 	}
+	// NOTE: NOT USED CURRENTLY
 	if(strcmp(cmd,SETUP_SLAVE_DELAY_TIME)==0)
 	{
 		// 250 ms should be more than enough!
@@ -763,6 +846,9 @@ void parse_setup_command(char* command, uint8_t length)
 			value = 250;
 		}
 		eeprom_write_byte((uint8_t*)slave_delay_addr, value);
+		// Now that we have written the new values we need to write the CRC
+		//uint16_t calculatedCRC = calc_crc();
+		//eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
 		serial_puts_p(strOK);
 		return;
 	}

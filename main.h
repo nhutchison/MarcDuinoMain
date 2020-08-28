@@ -97,6 +97,9 @@ void rc_command(uint8_t value);
 void stop_command(uint8_t value);
 void hold_command(uint8_t value);
 
+//Generate a CRC for the EEPROM
+uint16_t calc_crc();
+
 // i2c parsing (v1.8)
 void parse_i2c_command(char* command,uint8_t length);
 void sendI2C(uint8_t address, uint8_t* payload, uint8_t payload_length);
