@@ -62,6 +62,9 @@
 /////////////////////////////////////////////////////////////////////
 #define USER_MUSIC_SOUNDS_NUMBER 5
 
+// Settings to change which MP3 player we use.
+// For now use a #define, but later this will be a setup param
+//#define USE_DFP_MINI
 
 //////////////// don't change anything below this line //////////////
 
@@ -92,11 +95,21 @@
 //#define MP3_START_SOUND 255	// startup sound is number 255
 uint8_t mp3_start_sound;  // Startup sound as a global so we can set it
 
+// Defines for the Volume control
+// DFPlayer Mini has a different set of values used.
+#define DF_VOLUME_MID 	15	// guessing mid volume 32 is right in-between...
+#define DF_VOLUME_MIN 	1	// doc says anything below 64 is inaudible, not true, 100 is. 82 is another good value
+#define DF_VOLUME_MAX 	30	// doc says max is 0
+#define DF_VOLUME_STEPS 15	// R2 Touch app has 20 steps from min to max
+#define DF_VOLUME_OFF	0 // to turn it off... 255 gets a buzz.
+
+// Defines for the SparkFun MP3 Trigger
 #define MP3_VOLUME_MID 	50	// guessing mid volume 32 is right in-between...
 #define MP3_VOLUME_MIN 	100	// doc says anything below 64 is inaudible, not true, 100 is. 82 is another good value
 #define MP3_VOLUME_MAX 	0	// doc says max is 0
 #define MP3_VOLUME_STEPS 20	// R2 Touch app has 20 steps from min to max
 #define MP3_VOLUME_OFF	254 // to turn it off... 255 gets a buzz.
+
 
 #define MP3_PLAY_CMD 	't'	// command to play sound file on the MP3 trigger
 #define MP3_VOLUME_CMD 	'v'	// command to play sound file on the MP3 trigger
@@ -108,7 +121,7 @@ uint8_t mp3_start_sound;  // Startup sound as a global so we can set it
 
 
 // public
-void mp3_init();	// wait at least 3s after mp3trigger power up before calling
+void mp3_init(uint8_t player_select);	// wait at least 3s after mp3trigger power up before calling
 void mp3_parse_command(char* commandstr);
 void mp3_do_random(); // need to be called in the main loop for random sounds to work
 
@@ -133,6 +146,11 @@ void mp3_stop_random();
 void mp3_start_random();
 void mp3_check_timer();
 
+// DFPlayer Stuff
+void sendDFP (uint8_t *cmd);
+void playDFP(uint16_t index);
+void stopDFP();
+void mp3_setvolumeDFP(uint8_t vol);
 
 
 #endif /* MP3SOUND_H_ */

@@ -16,6 +16,18 @@
  *  Version 3.2: Added new #SQ Mode to turn chatty off, but leave sound on.
  *  Version 3.3: Added "OK" message on successful Setup command (errors were already present.
  *  Version 3.4: EEPROM CRC added to enable saving of default settings if EEPROM corrupt or never written
+ *  Version 3.5: Support for DF Player Mini added (February 20th 20201)
+ *
+ */
+
+/***********************
+ * Version 3.5 - Feb 20 2021
+ *
+ * Support for the DFPlayer Mini added
+ * Added Setup command to select the MP3 Player used
+ *   #SM0 - (Default) Use the SparkFun MP3 Trigger
+ *   #SM1 - DF Player Mini
+ * CRC Calculation updated. This will cause the old CRC to fail and all settings are returned to default!
  *
  */
 
@@ -252,7 +264,8 @@ unsigned int start_sound_eeprom_addr=2;
 unsigned int slave_delay_addr=3;
 unsigned int last_servo_addr=4;
 unsigned int random_sound_disabled=5;
-unsigned int stored_crc_addr = 6; // Uses a word.
+unsigned int mp3_player_select_addr=6;
+unsigned int stored_crc_addr = 7; // Uses a word.
 
 // timeout counter
 rt_timer killbuzz_timer;
@@ -260,7 +273,7 @@ rt_timer killbuzz_timer;
 
 // string constants are in program memory to save DRAM
 const char strOK[] PROGMEM="OK\n\r";
-const char strWelcome[] PROGMEM="\n\rMarcDuino Master v3.3 \n\r";
+const char strWelcome[] PROGMEM="\n\rMarcDuino Master v3.5 \n\r";
 const char strEnterPrompt[] PROGMEM="Enter panel command starting with \':\' \n\r";
 const char strInitializing[] PROGMEM="Initializing...\r\n";
 const char strSuart1OK[] PROGMEM="\n\rsuart1 Communication OK \n\r";
@@ -343,6 +356,9 @@ int main(void) {
 
 		// Set the Default chatty mode to on.
 		eeprom_write_byte((uint8_t*)random_sound_disabled, 0);
+
+		// Set the Default MP3 Player to be the SparkFun MP3 Trigger.
+		eeprom_write_byte((uint8_t*)mp3_player_select_addr, 0);
 
 		sprintf(string, "Generating new CRC. \r\n");
 		serial_puts(string);
@@ -433,7 +449,8 @@ int main(void) {
 	}
 
 	// The mp3_init will also trigger the startup sound
-	mp3_init();
+	// Configure for the MP3 Player used.
+	mp3_init(eeprom_read_byte((uint8_t*)mp3_player_select_addr));
 
 	// If startup sounds are disabled, then don't wait!
 	if (mp3_start_sound != 0)
@@ -559,6 +576,8 @@ uint16_t calc_crc()
 	calculatedCRC += eeprom_read_byte((uint8_t*)start_sound_eeprom_addr);
 	// Set the Default chatty mode to on.
 	calculatedCRC += eeprom_read_byte((uint8_t*)random_sound_disabled);
+	// Set the MP3 Player used.
+	calculatedCRC += eeprom_read_byte((uint8_t*)mp3_player_select_addr);
 
 	return calculatedCRC;
 }
@@ -849,6 +868,32 @@ void parse_setup_command(char* command, uint8_t length)
 		// Now that we have written the new values we need to write the CRC
 		//uint16_t calculatedCRC = calc_crc();
 		//eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
+		serial_puts_p(strOK);
+		return;
+	}
+	if(strcmp(cmd,SETUP_MP3_PLAYER)==0)
+	{
+		if (value > 1)
+		{
+#if _ERROR_MSG_ == 1
+			serial_puts_p("Err Setup Cmd\n\r");
+#endif
+			return;
+		}
+		//Value must be either 0 or 1
+		if (value == 0)
+		{
+			//Write the value to EEPROM
+			eeprom_write_byte((uint8_t*)mp3_player_select_addr, value);
+		}
+		if (value == 1)
+		{
+			//Write the value to EEPROM
+			eeprom_write_byte((uint8_t*)mp3_player_select_addr, value);
+		}
+		// Now that we have written the new values we need to write the CRC
+		uint16_t calculatedCRC = calc_crc();
+		eeprom_write_word((uint16_t*)stored_crc_addr, calculatedCRC);
 		serial_puts_p(strOK);
 		return;
 	}
@@ -1870,6 +1915,9 @@ void resetJEDIcallback()
 	_delay_ms(100);
 	suart_puts("@0T1\r");	// abort test routine, reset all to normal
 	_delay_ms(20);
+	suart_puts("%T00\r");  	// MP Off
+	//_delay_ms(20);
+	//suart_puts("%T00\r");  	// Logics reset to default
 	seq_remove_completion_callback();	// one shot, remove yourself
 }
 

@@ -78,6 +78,7 @@
 #define SETUP_START_SOUND "SS"		// Startup Sound. 0 = none, 1 = sound in 255, 2 = sound in 254, 3 = sound in 253
 #define SETUP_RANDOM_SOUND_DISABLED "SQ"		// Random Sounds Disabled.  0 = Random Sounds on, 1=Random Sounds disabled, volume 0, 2=Random Sounds disabled R2 Quiet
 #define SETUP_SLAVE_DELAY_TIME "ST"	// Slave commanding delay.  Allow you to tune the time between sending the Slave panel command and starting master panel command execution.
+#define SETUP_MP3_PLAYER "SM"       // Select the MP3 player to connect to.  0 = SparkFun MP3 Trigger (default), 1=DFPLayer Mini
 
 void echo(char ch);
 uint8_t build_command(char ch, char* output_str);

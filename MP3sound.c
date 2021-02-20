@@ -97,6 +97,7 @@ static const uint8_t mp3_max_sounds[] =
 static uint8_t mp3_volume=MP3_VOLUME_MID;
 static uint8_t saveflag;
 const char strSoundCmdError[] PROGMEM = "Invalid MP3Trigger Sound Command";
+static uint8_t soundUsed = 0; // Defaults to SparkFun MP3 Trigger.  Updated in the init function.
 
 // globals needed for random sound function in main loop
 rt_timer mp3_random_timer;	// the timer to the next random sound
@@ -144,12 +145,25 @@ void mp3_resume_random()
 
 
 // you need to wait 3 or 4 seconds after power up to call that one
-void  mp3_init()
+void  mp3_init(uint8_t player_select)
 {
 	// this implementation assumes the realtime unit has already been initialized in main.c
 	// rt_init();
 	// and we also assume suart2 has been initialized in main.c
 	// suart2_init(9600);
+
+	// Allows us to configure between the SparkFun Mp3 trigger (0) and the DF Player Mini (1)
+	soundUsed = player_select;
+
+	// If the DFPlayer is selected, we need to update the sound stuff.
+	if (soundUsed) {
+		mp3_volume=DF_VOLUME_MID;
+		// Call all the setup stuff for the EQ etc.
+		// Set the Equaliser to Normal
+		uint8_t setup_cmd [] = { 0x7E, 0xFF, 0x06, 0x07, 00, 00, 00, 0xFE, 0xED, 0xEF};
+		sendDFP(setup_cmd);
+	}
+
 
 	for(uint8_t i=0; i<MP3_MAX_BANKS; i++)
 	{
@@ -401,9 +415,13 @@ void mp3_sound(uint8_t bank, uint8_t sound)
 		filenum = (bank-1)*MP3_MAX_SOUNDS_PER_BANK + sound;
 	}
 
-	// send a 't'nnn number where nnn=file number
-	mp3_send_command_byte(MP3_PLAY_CMD);
-	mp3_send_command_byte(filenum);
+	if (soundUsed){
+		playDFP(filenum);
+	} else {
+		// send a 't'nnn number where nnn=file number
+		mp3_send_command_byte(MP3_PLAY_CMD);
+		mp3_send_command_byte(filenum);
+	}
 
 #ifdef _MP3_DEBUG_MESSAGES_
 	printstr("MP3 Sound: ");
@@ -424,7 +442,11 @@ void mp3_stop()
 	// this doesn't work as this is a start/stop combined
 	//mp3_send_command_byte(MP3_STOP_CMD);
 	// instead go to an empty sound
-	mp3_sound(0,MP3_EMPTY_SOUND);
+	if (soundUsed){
+		stopDFP();
+	} else {
+		mp3_sound(0,MP3_EMPTY_SOUND);
+	}
 //#ifdef _MP3_DEBUG_MESSAGES_
 //	printstr("MP3 stop: ");
 //	printlnchar(MP3_STOP_CMD);
@@ -433,71 +455,173 @@ void mp3_stop()
 
 void mp3_volumeup()
 {
-	uint8_t step=(MP3_VOLUME_MIN - MP3_VOLUME_MAX)/MP3_VOLUME_STEPS;
-	// volume was at max or too high
-	if(mp3_volume<=MP3_VOLUME_MAX) mp3_volume=MP3_VOLUME_MAX;
-	else
-	{
-		// the step would be too big, peg to maximum
-		if (mp3_volume-MP3_VOLUME_MAX<step)
-			mp3_volume=MP3_VOLUME_MAX;
-		// go up down step (volume goes inverse with value)
+	if (soundUsed){
+		uint8_t step=DF_VOLUME_MAX/DF_VOLUME_STEPS;
+
+		// volume was at max or too high
+		if(mp3_volume>=DF_VOLUME_MAX) mp3_volume=DF_VOLUME_MAX;
 		else
-			mp3_volume-=step;
+		{
+			// the step would be too big, peg to maximum
+			if (mp3_volume+step>DF_VOLUME_MAX)
+				mp3_volume=DF_VOLUME_MAX;
+			// go up down step (volume goes inverse with value)
+			else
+				mp3_volume+=step;
+		}
+
+		mp3_setvolumeDFP(mp3_volume);
+	} else {
+
+		uint8_t step=(MP3_VOLUME_MIN - MP3_VOLUME_MAX)/MP3_VOLUME_STEPS;
+
+		// volume was at max or too high
+		if(mp3_volume<=MP3_VOLUME_MAX) mp3_volume=MP3_VOLUME_MAX;
+		else
+		{
+			// the step would be too big, peg to maximum
+			if (mp3_volume-MP3_VOLUME_MAX<step)
+				mp3_volume=MP3_VOLUME_MAX;
+			// go up down step (volume goes inverse with value)
+			else
+				mp3_volume-=step;
+		}
+
+		mp3_setvolume(mp3_volume);
 	}
-	mp3_setvolume(mp3_volume);
+
 }
 
 void mp3_volumedown()
 {
-	uint8_t step=(MP3_VOLUME_MIN-MP3_VOLUME_MAX)/MP3_VOLUME_STEPS;
-	// volume was set to off, or ended up too low
-	if(mp3_volume>MP3_VOLUME_MIN) mp3_volume=MP3_VOLUME_MIN;
-	else
-	{
-		// the step would be too bit, peg to minimum
-		if (MP3_VOLUME_MIN-mp3_volume<step)
-			mp3_volume=MP3_VOLUME_MIN;
-		// go up one step (volume goes inverse with value)
+	if (soundUsed){
+		uint8_t step=DF_VOLUME_MAX/DF_VOLUME_STEPS;
+		// volume was set to off, or ended up too low
+		if(mp3_volume<DF_VOLUME_MIN) mp3_volume=DF_VOLUME_MIN;
 		else
-			mp3_volume+=step;
+		{
+			// the step would be too bit, peg to minimum
+			if (mp3_volume - step < DF_VOLUME_MIN)
+				mp3_volume=DF_VOLUME_MIN;
+			// go up one step (volume goes inverse with value)
+			else
+				mp3_volume-=step;
+		}
+		mp3_setvolumeDFP(mp3_volume);
+	} else {
+		uint8_t step=(MP3_VOLUME_MIN-MP3_VOLUME_MAX)/MP3_VOLUME_STEPS;
+		// volume was set to off, or ended up too low
+		if(mp3_volume>MP3_VOLUME_MIN) mp3_volume=MP3_VOLUME_MIN;
+		else
+		{
+			// the step would be too bit, peg to minimum
+			if (MP3_VOLUME_MIN-mp3_volume<step)
+				mp3_volume=MP3_VOLUME_MIN;
+			// go up one step (volume goes inverse with value)
+			else
+				mp3_volume+=step;
+		}
+		mp3_setvolume(mp3_volume);
 	}
-	mp3_setvolume(mp3_volume);
 }
 
 void mp3_volumemid()
 {
-	mp3_volume=MP3_VOLUME_MID;
+	if (soundUsed){
+		mp3_volume=DF_VOLUME_MID;
+	} else {
+		mp3_volume=MP3_VOLUME_MID;
+	}
 	mp3_setvolume(mp3_volume);
 }
 
 void mp3_volumeoff()
 {
-	mp3_volume=MP3_VOLUME_OFF;
+	if (soundUsed){
+		mp3_volume=DF_VOLUME_OFF;
+	} else {
+		mp3_volume=MP3_VOLUME_OFF;
+	}
 	mp3_setvolume(mp3_volume);
-
 }
 
 void mp3_volumemax()
 {
-	mp3_volume=MP3_VOLUME_MAX;
+	if (soundUsed){
+		mp3_volume=DF_VOLUME_MAX;
+	} else {
+		mp3_volume=MP3_VOLUME_MAX;
+	}
 	mp3_setvolume(mp3_volume);
 }
 
 void mp3_volumemin()
 {
-	mp3_volume=MP3_VOLUME_MIN;
+	if (soundUsed){
+		mp3_volume=DF_VOLUME_MIN;
+	} else {
+		mp3_volume=MP3_VOLUME_MIN;
+	}
 	mp3_setvolume(mp3_volume);
 }
 
 void mp3_setvolume(uint8_t vol)
 {
-	mp3_send_command_byte(MP3_VOLUME_CMD);
-	mp3_send_command_byte(vol);
+	if (soundUsed){
+		mp3_setvolumeDFP(vol);
+	} else {
+		mp3_send_command_byte(MP3_VOLUME_CMD);
+		mp3_send_command_byte(vol);
+	}
+
 #ifdef _MP3_DEBUG_MESSAGES_
 	printstr("MP3 Volume: ");
 	printchar(MP3_VOLUME_CMD);
 	printchar(' ');
 	printlnuint(vol);
 #endif
+}
+
+void sendDFP (uint8_t *cmd) {
+  uint16_t checksum = 0;
+  for (int i=2; i<8; i++) {
+    checksum += cmd[i];
+  }
+  cmd[7] = (uint8_t)~(checksum >> 8);
+  cmd[8] = (uint8_t)~(checksum);
+  //for (int i=0; i<10; i++) { //send cmd
+	  //mp3_send_command_byte(cmd[i]);
+	  //suart2_putc(cmd[i]);
+  //}
+
+  suart2_putc(cmd[0]);
+  suart2_putc(cmd[1]);
+  suart2_putc(cmd[2]);
+  suart2_putc(cmd[3]);
+  suart2_putc(cmd[4]);
+  suart2_putc(cmd[5]);
+  suart2_putc(cmd[6]);
+  suart2_putc(cmd[7]);
+  suart2_putc(cmd[8]);
+  suart2_putc(cmd[9]);
+
+}
+void playDFP(uint16_t index) {
+	// {start, version, length, CMD (12 play mp3 folder) 03 - root, feedback (off), param MSB, param LSB, checksum MSB, checksum LSB, end byte}
+	static uint8_t play_cmd [10] = { 0x7E, 0xFF, 0x06, 0x12, 00, 00, 00, 0xFE, 0xee, 0xEF};
+	play_cmd[5] = (uint8_t)(index >> 8);
+	play_cmd[6] = (uint8_t)(index);
+
+	sendDFP(play_cmd);
+}
+
+void stopDFP() {
+	static uint8_t stop_cmd [] = { 0x7E, 0xFF, 0x06, 0x0E, 00, 00, 00, 0xFE, 0xED, 0xEF};
+	sendDFP(stop_cmd);
+}
+
+void mp3_setvolumeDFP(uint8_t vol) {
+	static uint8_t volset_cmd [] = { 0x7E, 0xFF, 0x06, 0x05, 00, 00, 00, 0xFE, 0xED, 0xEF};
+	volset_cmd[6] = (uint8_t)(vol);
+	sendDFP(volset_cmd);
 }
