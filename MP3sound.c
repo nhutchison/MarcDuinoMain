@@ -621,7 +621,7 @@ void stopDFP() {
 }
 
 void mp3_setvolumeDFP(uint8_t vol) {
-	static uint8_t volset_cmd [] = { 0x7E, 0xFF, 0x06, 0x05, 00, 00, 00, 0xFE, 0xED, 0xEF};
+	static uint8_t volset_cmd [] = { 0x7E, 0xFF, 0x06, 0x06, 00, 00, 00, 0xFE, 0xED, 0xEF};
 	volset_cmd[6] = (uint8_t)(vol);
 	sendDFP(volset_cmd);
 }
