@@ -132,6 +132,10 @@ void MagicPanelVU();
 void MagicPanelCylonH();
 void resetMPcallback();
 
+// Perform Client EXT1 Actions
+void EXT1On(uint8_t seconds);
+void EXT1Off();
+
 // Perform Display actions
 void DisplayNormal();
 void DisplayScream();

@@ -21,6 +21,14 @@
  */
 
 /***********************
+ * Version 3.6 - Feb 22 2023
+ *
+ * Support for triggering EXT1 Pin on Client added
+ * Can be used to trigger a smoke machine as an example.
+ *
+ */
+
+/***********************
  * Version 3.5 - Feb 20 2021
  *
  * Support for the DFPlayer Mini added
@@ -218,6 +226,14 @@
  *		Use this if the Slave panels are starting too soon
  *		Values up to 250 are supported.  Values are in ms.
  *
+ *  Client Features
+ *  *EOxx Pull pin high/low (config in Client code) on EXT1.
+ *        Can be used to trigger a smoke machine as an example.
+ *        xx is the time in seconds.
+ *        00 - off
+ *        01-98 is the time in seconds (don't use values >10 for smoke machines!)
+ *        99 on permanently (again don't use for smoke machines)
+ *
  */
 
 #include "main.h"
@@ -273,7 +289,7 @@ rt_timer killbuzz_timer;
 
 // string constants are in program memory to save DRAM
 const char strOK[] PROGMEM="OK\n\r";
-const char strWelcome[] PROGMEM="\n\rMarcDuino Master v3.5 \n\r";
+const char strWelcome[] PROGMEM="\n\rMarcDuino Master v3.6 \n\r";
 const char strEnterPrompt[] PROGMEM="Enter panel command starting with \':\' \n\r";
 const char strInitializing[] PROGMEM="Initializing...\r\n";
 const char strSuart1OK[] PROGMEM="\n\rsuart1 Communication OK \n\r";
@@ -1430,6 +1446,7 @@ void sequence_command(uint8_t value)
 			seq_add_completion_callback(resetMPcallback); 	    // callback to reset Magic Panel at end of sequence
 			seq_loadsequence(panel_all_open_long, SEQ_SIZE(panel_all_open_long));
 			seq_loadspeed(panel_super_slow_speed);	// very slow speed open
+			EXT1On(4); // Turn on Smoke for 4 seconds  Do first so there's smoke when the panels open.
 			DisplayShortCircuit();  				// short circuit display
 			SoundFaint(); 							// Faint sound
 			MagicFlicker(10);  						// Magic Panel Flicker for 10 seconds
@@ -1673,6 +1690,7 @@ void sequence_command(uint8_t value)
 			seq_stopsequence(); 				// abort any previous sequence immediately
 			seq_loadsequence(panel_all_open_long, SEQ_SIZE(panel_all_open_long));
 			seq_loadspeed(panel_super_slow_speed);	// very slow close
+			EXT1On(4); // Turn on Smoke for 4 seconds
 			StartSlaveSequence(value);			// Trigger the same sequence on the Slave.  These need to stay in Sync!
 			seq_startsequence();
 #if _FEEDBACK_MSG_ == 1
@@ -2143,8 +2161,27 @@ void resetMPcallback()
 	seq_remove_completion_callback();	// one shot, remove yourself
 }
 
+// Client EXT1 Controls
+void EXT1On(uint8_t seconds)	// seconds from 0 (off) to 99 (always on)
+{
+	char string[8];
+	sprintf(string, "*EO%02d\r", seconds);
+	suart_puts(string);
+
+	_delay_ms(50);
+}
+
+void EXT1Off()	// seconds from 0 (off) to 99 (always on)
+{
+	char string[8];
+	sprintf(string, "*EO%02d\r", 0);
+	suart_puts(string);
+
+	_delay_ms(50);
+}
+
 ///////////////////////////
-// Slave Sequence commands
+// Client Sequence commands
 ///////////////////////////
 void StartSlaveSequence(uint8_t value)
 {
