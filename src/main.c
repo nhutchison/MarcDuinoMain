@@ -349,7 +349,7 @@ int main(void) {
 	// Get the current CRC from the EEPROM
 	uint16_t storedCRC = eeprom_read_word((uint16_t*)stored_crc_addr);
 
-	char string[30];
+	char string[128];
 	sprintf(string, "Calc CRC: %X StoredCRC: %X \r\n", calculatedCRC, storedCRC);
 	serial_puts(string);
 
@@ -1872,7 +1872,7 @@ void stop_command(uint8_t value)
 		 {
 			 panel_rc_control[i-1]=0;
 			 servo_set(i,SERVO_NO_PULSE);
-			 panel_to_silence[i]=1;	// flag the panel to silence, will be caught in main loop
+			 panel_to_silence[i-1]=1;	// flag the panel to silence, will be caught in main loop
 		 }
 		killbuzz_timer=COUNT_PER_SECOND/3; // set a 1/3s timer
 
