@@ -21,6 +21,14 @@
  */
 
 /***********************
+ * Version 3.7 - Dec 04 2023
+ *
+ * Fix sending of % commands from main to client.
+ * Command was not being sent on suart2 (to client) pin.
+ *
+ */
+
+/***********************
  * Version 3.6 - Feb 22 2023
  *
  * Support for triggering EXT1 Pin on Client added
@@ -289,7 +297,7 @@ rt_timer killbuzz_timer;
 
 // string constants are in program memory to save DRAM
 const char strOK[] PROGMEM="OK\n\r";
-const char strWelcome[] PROGMEM="\n\rMarcDuino Master v3.6 \n\r";
+const char strWelcome[] PROGMEM="\n\rMarcDuino Master v3.7 \n\r";
 const char strEnterPrompt[] PROGMEM="Enter panel command starting with \':\' \n\r";
 const char strInitializing[] PROGMEM="Initializing...\r\n";
 const char strSuart1OK[] PROGMEM="\n\rsuart1 Communication OK \n\r";
@@ -990,8 +998,8 @@ void parse_alt2_command(char* command, uint8_t length)
 #if _FEEDBACK_MSG_ == 1
 	serial_puts_p(strAlt1Command);
 #endif
-	suart_puts(command);   	// keep the start character
-	suart_putc('\r');		// add the termination character
+	suart2_puts(command);   	// keep the start character
+	suart2_putc('\r');		// add the termination character
 }
 
 #if _ERROR_MSG_ == 1
